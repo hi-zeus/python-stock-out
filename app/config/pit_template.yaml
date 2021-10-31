@@ -1,0 +1,78 @@
+{
+  "RMS": {
+    "local": {
+      "api": {
+        "service_secret": ,
+        "license_key":
+      }
+    },
+    "production": {
+      "api": {
+        "service_secret": ,
+        "license_key":
+      }
+    }
+  },
+  "AuPayMarket": {
+    "local": {
+      "api": {
+        "api_key":
+      }
+    },
+    "production": {
+      "api": {
+        "api_key":
+      }
+    }
+  },
+  "YahooShopping": {
+    "local": {
+      "business_id": ,
+      "business_password": ,
+      "yahoo_id": ,
+      "yahoo_password":
+    },
+    "production": {
+      "business_id": ,
+      "business_password": ,
+      "yahoo_id": ,
+      "yahoo_password":
+    }
+  },
+  "YJDN": {
+    "test": {
+      "stockout": {
+        1: {
+          "application_id": ,
+          "secret":
+        },
+        2: {
+          "application_id": ,
+          "secret":
+        }
+      }
+    },
+    "production": {
+      "stockout": {
+        1: {
+          "application_id": ,
+          "secret":
+        },
+        2: {
+          "application_id": ,
+          "secret":
+        }
+      }
+    }
+  },
+  "MQ": {
+    "local": {
+      "user": ,
+      "password":
+    },
+    "production": {
+      "user": ,
+      "password":
+    }
+  }
+}
