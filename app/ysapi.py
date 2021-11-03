@@ -39,9 +39,16 @@ class OrderListData:
 
 
 @dataclass
-class OrderInfoData:
+class OrderInfoItemData:
     item_id: str
     title: str
+
+
+@dataclass
+class OrderInfoData:
+    order_id: str
+    order_status: int
+    items: List[OrderInfoItemData]
 
 
 @dataclass
@@ -483,7 +490,7 @@ class OrderInfoAPI:
             <Req>
                 <Target>
                     <OrderId>{order_id}</OrderId>
-                    <Field>OrderId,ItemId,Title</Field>
+                    <Field>OrderId,OrderStatus,ItemId,Title</Field>
                 </Target>
                 <SellerId>{seller_id}</SellerId>
             </Req>
@@ -512,11 +519,20 @@ class OrderInfoAPI:
 
         root_response = ET.fromstring(res.text)
         order_info_list = []
-        for el_item in root_response.findall('.//OrderInfo//Item'):
-            item_id = el_item.find('.//ItemId').text
-            title = el_item.find('.//Title').text
-            order_inf_data = OrderInfoData(item_id=item_id,
-                                           title=title)
+        for el_order_info in root_response.findall('.//OrderInfo'):
+            order_id_ = el_order_info.find('.//OrderId').text
+            order_status = int(el_order_info.find('.//OrderStatus').text)
+            order_items = []
+            for el_item in el_order_info.findall('.//Item'):
+                item_id = el_item.find('.//ItemId').text
+                title = el_item.find('.//Title').text
+                order_item_data = OrderInfoItemData(item_id=item_id,
+                                                    title=title)
+                order_items.append(order_item_data)
+
+            order_inf_data = OrderInfoData(order_id=order_id_,
+                                           order_status=order_status,
+                                           items=order_items)
             order_info_list.append(order_inf_data)
 
         return order_info_list

@@ -30,6 +30,7 @@ class OrderItemData:
 @dataclass
 class OrderData:
     order_number: str
+    order_progress: int
     order_items: List[OrderItemData]
 
 
@@ -271,6 +272,7 @@ class RakutenOrderAPI:
             res_json = res.json()
             for order_model in res_json.get('OrderModelList', []):
                 order_number = order_model['orderNumber']
+                order_progress = order_model['orderProgress']
 
                 order_items = []
                 for package_model in order_model['PackageModelList']:
@@ -279,7 +281,9 @@ class RakutenOrderAPI:
                         manage_number = item_model['manageNumber']
                         order_items.append(OrderItemData(item_name=item_name, manage_number=manage_number))
 
-                orders.append(OrderData(order_number=order_number, order_items=order_items))
+                orders.append(OrderData(order_number=order_number,
+                                        order_progress=order_progress,
+                                        order_items=order_items))
 
         return orders
 

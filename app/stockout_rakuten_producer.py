@@ -40,6 +40,21 @@ def _get_order_item_id_list(log: logger.Logger) -> List[str]:
 
         item_ids = []
         for order_data in order_data_list:
+            order_progress = order_data.order_progress
+            # 受注ステータス(在庫連動対象)
+            # 100: 注文確認待ち
+            # 200: 楽天処理中
+            # 300: 発送待ち
+            # 400: 変更確定待ち
+            # 500: 発送済
+            # 600: 支払手続き中
+            # 700: 支払手続き済
+            if order_progress not in [100, 200, 300, 400, 500, 600, 700]:
+                # 受注ステータス(在庫連動対象外)
+                # 800: キャンセル確定待ち
+                # 900: キャンセル確定
+                continue
+
             for order_item in order_data.order_items:
                 item_ids.append(order_item.manage_number)
 

@@ -56,8 +56,22 @@ def _get_order_item_id_list(task_no: int, log: logger.Logger) -> List[str]:
             order_info_list = api.shopping.order.info.get(order_id=order_id)
 
             for order_info in order_info_list:
-                item_id = order_info.item_id
-                item_ids.append(item_id)
+                order_status = order_info.order_status
+                # 受注ステータス(在庫連動対象)
+                # 1 : 予約中
+                # 2 : 処理中
+                # 5 : 完了
+                if order_status not in [1, 2, 5]:
+                    # 受注ステータス(在庫連動対象外)
+                    # 3 : 保留
+                    # 4 : キャンセル
+                    continue
+
+                order_items = order_info.items
+                if order_items:
+                    for order_item in order_items:
+                        item_id = order_item.item_id
+                        item_ids.append(item_id)
 
     log.info('Get order list: order_list={order_list}'.format(order_list=item_ids))
     return item_ids
