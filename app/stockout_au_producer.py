@@ -40,9 +40,8 @@ def _get_order_item_id_list(log: logger.Logger) -> List[str]:
             order_status = order.order_status
             # 受注ステータスを確認
             if order_status not in ['新規受付', '発送前入金待ち', '与信待ち', '発送待ち', '発送後入金待ち', '完了',
-                                    '新規予約', '予約中']:
+                                    '新規予約', '予約中', '保留']:
                 # 受注ステータス(在庫連動対象外)
-                # 保留
                 # キャンセル
                 # 各種カスタムステータス（受注管理で貴店舗が登録したステータス名）
                 # 不正取引審査中

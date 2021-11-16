@@ -60,10 +60,10 @@ def _get_order_item_id_list(task_no: int, log: logger.Logger) -> List[str]:
                 # 受注ステータス(在庫連動対象)
                 # 1 : 予約中
                 # 2 : 処理中
+                # 3 : 保留
                 # 5 : 完了
-                if order_status not in [1, 2, 5]:
+                if order_status not in [1, 2, 3, 5]:
                     # 受注ステータス(在庫連動対象外)
-                    # 3 : 保留
                     # 4 : キャンセル
                     continue
 
