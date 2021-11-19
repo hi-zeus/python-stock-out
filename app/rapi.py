@@ -116,7 +116,8 @@ class RakutenItemAPI:
                                              headers=headers,
                                              payload=payload)
             if response.status_code != 200:
-                return None
+                self.log.error('Failed to post request to item get error=%s', response.text)
+                raise RakutenAPIError('Failed to post request to item get status not 200')
         except Exception:
             self.log.exception('Failed to get request to get item')
             raise RakutenAPIError('Failed to get request to get item')
@@ -174,7 +175,8 @@ class RakutenItemAPI:
                                          headers=headers,
                                          data=data)
             if res.status_code != 200:
-                return False
+                self.log.error('Failed to post request to item update error=%s', res.text)
+                raise RakutenAPIError('Failed to post request to item update status not 200')
         except Exception:
             self.log.exception('Failed to post request to update item')
             raise RakutenAPIError('Failed to post request to update item')
@@ -227,7 +229,8 @@ class RakutenOrderAPI:
                                              headers=headers,
                                              data=json.dumps(post_data).encode('utf-8'))
                 if res.status_code != 200:
-                    return []
+                    self.log.error('Failed to post request to search order list error=%s', res.text)
+                    raise RakutenAPIError('Failed to post request to search order list status not 200')
             except Exception:
                 self.log.exception('Failed to post request to search order list')
                 raise RakutenAPIError('Failed to post request to search order list')
@@ -263,7 +266,8 @@ class RakutenOrderAPI:
                                              headers=headers,
                                              data=json.dumps(post_data).encode('utf-8'))
                 if res.status_code != 200:
-                    return []
+                    self.log.error('Failed to post request to search order get error=%s', res.text)
+                    raise RakutenAPIError('Failed to post request to search order get status not 200')
             except Exception:
                 self.log.exception('Failed to post request to get order')
                 raise RakutenAPIError('Failed to post request to get order')

@@ -110,7 +110,8 @@ class AuStockAPI:
                                              headers=headers,
                                              payload=post_data)
             if response.status_code != 200:
-                return []
+                self.log.error('Failed to post request to stock search error=%s', response.text)
+                raise AuAPIError('Failed to post request to stock search status not 200')
         except Exception:
             self.log.exception('Failed to post request to search stock')
             raise AuAPIError('Failed to post request to search stock')
@@ -211,7 +212,8 @@ class AuTradeAPI:
             try:
                 response = self._api.request_get(url=url, headers=headers, payload=post_data)
                 if response.status_code != 200:
-                    continue
+                    self.log.error('Failed to post request to trade search error=%s', response.text)
+                    raise AuAPIError('Failed to post request to trade search status not 200')
             except Exception:
                 self.log.exception('Failed to get request to search trade')
                 raise AuAPIError('Failed to get request to search trade')
