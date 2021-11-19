@@ -45,6 +45,7 @@ def _stockout(msg_data: MQMsgData,
 
         set_list = []
         for stock_data in stock_list:
+            log.info('stock item=%s', stock_data)
             item_id = stock_data.item_code
             quantity = stock_data.quantity
             if quantity > 0:
