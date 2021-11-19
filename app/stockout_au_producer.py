@@ -7,6 +7,7 @@ from typing import List
 import uuid
 
 import const
+from logging import Logger
 import logger
 from mq import MQ, MQMsgData
 import auapi
@@ -15,24 +16,25 @@ import auapi
 def _send_msg(send_data: MQMsgData,
               queue_name: str,
               routing_key: str,
-              log: logger.Logger):
+              log: Logger):
     try:
         with MQ(**const.MQ_CONNECT,
                 queue=queue_name,
                 routing_key=routing_key) as queue:
             msg = asdict(send_data)
             queue.send_message(message=msg)
-            log.info('Send message queue={queue}, data={data}'.format(queue=queue_name, data=msg))
+            log.info('Send message queue=%(queue)s, data=%(data)s', {'queue': queue_name, 'data': msg})
     except Exception:
         log.exception('Failed to send mq message error')
         raise
 
 
-def _get_order_item_id_list(log: logger.Logger) -> List[str]:
+def _get_order_item_id_list(log: Logger) -> List[str]:
     end_time = datetime.now()
     start_time = end_time - timedelta(days=const.ORDER_LIST_GET_LAST_DAYS)
 
     with auapi.AuAPI(log=log) as api:
+        log.info('Request to get order')
         orders = api.trade.search(start_time=start_time, end_time=end_time)
 
         item_ids = []
@@ -51,11 +53,11 @@ def _get_order_item_id_list(log: logger.Logger) -> List[str]:
             for detail in order.details:
                 item_ids.append(detail.item_code)
 
-    log.info('Get order list: order_list={order_list}'.format(order_list=item_ids))
+    log.info('Get order list: order_list=%s', item_ids)
     return item_ids
 
 
-def _producer(log: logger.Logger):
+def _producer(log: Logger):
     item_ids = _get_order_item_id_list(log=log)
     if not item_ids:
         return
@@ -84,13 +86,13 @@ def main():
                         help='input process No type integer')
 
     arg_parser = parser.parse_args()
-    log = logger.Logger(task_name='stockout-au-producer',
-                        sub_name='main',
-                        name_datetime=datetime.now(),
-                        task_no=arg_parser.task_no,
-                        **const.LOG_SETTING)
+    log = logger.get_logger(task_name='stockout-au-producer',
+                            sub_name='main',
+                            name_datetime=datetime.now(),
+                            task_no=arg_parser.task_no,
+                            **const.LOG_SETTING)
     log.info('Start task')
-    log.info('Input args task_no={task_no}'.format(task_no=arg_parser.task_no))
+    log.info('Input args task_no=%s', arg_parser.task_no)
 
     _producer(log=log)
     log.info('End task')

@@ -6,15 +6,17 @@ from typing import Dict
 import functools
 
 import const
+from logging import Logger
 import logger
 from mq import MQ, MQMsgData
 import rapi
 
 
-def _stockout(msg_data: MQMsgData, log: logger.Logger):
+def _stockout(msg_data: MQMsgData, log: Logger):
     item_ids = msg_data.item_ids
     with rapi.RakutenAPI(log=log) as api:
         try:
+            log.info('Request to get inventory')
             inventories = api.inventory.get(item_urls=item_ids)
         except Exception:
             raise Exception('stockout error')
@@ -28,30 +30,31 @@ def _stockout(msg_data: MQMsgData, log: logger.Logger):
 
         if set_list:
             try:
+                log.info('Request to stock out list=%s', set_list)
                 result = api.inventory.update(update_items=set_list)
             except Exception:
                 log.exception('Failed to update stock')
                 raise Exception('stockout error')
-            log.info('Update stock data={data}'.format(data=set_list))
-            log.info('update stock error data={data}'.format(data=result))
+            log.info('Update stock data=%s', set_list)
+            log.info('update stock error data=%s', result)
             return
 
         log.info('NA update stock data')
 
 
-def _relist_on_message(msg: Dict, log: logger.Logger) -> bool:
-    log.info('Message data={data}'.format(data=logger.var_dump(msg)))
+def _relist_on_message(msg: Dict, log: Logger) -> bool:
+    log.info('Message data=%s', logger.var_dump(msg))
     try:
         msg_data = MQMsgData(**msg)
     except Exception:
         raise Exception('Receive message parse error')
-    log.info('Get queue message data={data}'.format(data=msg_data))
+    log.info('Get queue message data=%s', msg_data)
 
     _stockout(msg_data=msg_data, log=log)
     return True
 
 
-def _consumer(log: logger.Logger):
+def _consumer(log: Logger):
     try:
         with MQ(**const.MQ_CONNECT,
                 queue=const.MQ_RAKUTEN_QUEUE,
@@ -73,13 +76,13 @@ def main():
                         help='input process No type integer')
 
     arg_parser = parser.parse_args()
-    log = logger.Logger(task_name='stockout-rakuten-consumer',
-                        sub_name='main',
-                        name_datetime=datetime.now(),
-                        task_no=arg_parser.task_no,
-                        **const.LOG_SETTING)
+    log = logger.get_logger(task_name='stockout-rakuten-consumer',
+                            sub_name='main',
+                            name_datetime=datetime.now(),
+                            task_no=arg_parser.task_no,
+                            **const.LOG_SETTING)
     log.info('Start task')
-    log.info('Input args task_no={task_no}'.format(task_no=arg_parser.task_no))
+    log.info('Input args task_no=%s', arg_parser.task_no)
 
     _consumer(log=log)
     log.info('End task')

@@ -5,7 +5,7 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 
 import const
-import logger
+from logging import Logger
 from apireq import APIRequests
 
 
@@ -60,7 +60,7 @@ class AuAPI:
     base_url: str = 'https://api.manager.wowma.jp/wmshopapi'
 
     def __init__(self,
-                 log: logger.Logger,
+                 log: Logger,
                  retry_total: int = 5,
                  backoff_factor: int = 2,
                  connect_timeout: float = 30.0,
@@ -83,12 +83,12 @@ class AuAPI:
 
     @staticmethod
     def get_authz() -> bytes:
-        auth = 'Bearer {api_key}'.format(api_key=const.AUPAYM_API_KEY)
+        auth = f'Bearer {const.AUPAYM_API_KEY}'
         return bytes(auth, encoding='utf-8')
 
 
 class AuStockAPI:
-    def __init__(self, api: APIRequests, log: logger.Logger):
+    def __init__(self, api: APIRequests, log: Logger):
         self._api = api
         self.log = log
 
@@ -131,22 +131,21 @@ class AuStockAPI:
         return stocks
 
     def update(self, update_items: List[AuUpdateStockData]) -> List[AuUpdateErrorResponseData]:
-        xml = """
+        xml = f"""
         <request>
-            <shopId>{shop_id}</shopId>
-        </request>""".format(shop_id=AuAPI.shop_id)
+            <shopId>{AuAPI.shop_id}</shopId>
+        </request>"""
         root = ET.fromstring(xml)
         root.set('version', '1.0')
         root.set('encoding', 'UTF-8')
 
         for item in update_items:
-            xml = """
+            xml = f"""
             <stockUpdateItem>
-                <itemCode>{item_code}</itemCode>
+                <itemCode>{item.item_code}</itemCode>
                 <stockSegment>1</stockSegment>
-                <stockCount>{stock_count}</stockCount>
-            </stockUpdateItem>""".format(item_code=item.item_code,
-                                         stock_count=item.stock_count)
+                <stockCount>{item.stock_count}</stockCount>
+            </stockUpdateItem>"""
             el_stock_update_item = ET.fromstring(xml)
             root.append(el_stock_update_item)
 
@@ -183,7 +182,7 @@ class AuStockAPI:
 
 
 class AuTradeAPI:
-    def __init__(self, api: APIRequests, log: logger.Logger):
+    def __init__(self, api: APIRequests, log: Logger):
         self._api = api
         self.log = log
 

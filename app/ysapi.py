@@ -3,12 +3,13 @@
 import os
 import time
 from datetime import datetime
+import re
 import xml.etree.ElementTree as ET
 from retry import retry
 import urllib.parse
 import uuid
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import json
 from json import JSONDecodeError
 from selenium import webdriver
@@ -17,7 +18,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
-import logger
+from logging import Logger
 import const
 from apireq import APIRequests
 
@@ -117,7 +118,7 @@ class YahooWebDriver:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    @retry(tries=3, delay=2, backoff=2, jitter=0.5)
+    @retry(tries=3, delay=3, backoff=2, jitter=1)
     def setup(self,
               business_id: str,
               business_password: str,
@@ -195,7 +196,7 @@ class YahooAuth:
                  application_id: str,
                  secret: str,
                  auth_file: str,
-                 log: logger.Logger,
+                 log: Logger,
                  business_id: str,
                  business_password: str,
                  yahoo_id: str,
@@ -208,7 +209,7 @@ class YahooAuth:
         self.authz_code: Optional[str] = None
         self.access_token: Optional[str] = None
         self.refresh_token: Optional[str] = None
-        self.log: logger.Logger = log
+        self.log: Logger = log
         self.business_id = business_id
         self.business_password = business_password
         self.yahoo_id = yahoo_id
@@ -216,6 +217,7 @@ class YahooAuth:
         self.auth_file = auth_file
 
         self._load_auth()
+        self.update_token()
 
     def _get_az_code(self):
         with YahooWebDriver(profile_dir=self.profile_dir, headless=const.DRIVER_HEADLESS) as driver:
@@ -342,7 +344,7 @@ class YahooAuth:
             self.log.exception('Failed to output auth file')
             raise YahooAuthError('Failed to output auth file')
 
-    def _re_auth(self):
+    def re_auth(self):
         try:
             self._get_az_code()
             self._get_access_token()
@@ -351,9 +353,12 @@ class YahooAuth:
             self.log.exception('Failed to get az code')
             raise YahooAuthError('Failed to get az code')
 
-    def _refresh(self):
+    @retry(tries=3, delay=3, backoff=2, jitter=1)
+    def update_token(self):
         if not self.refresh_token:
-            return False, None, None
+            self.log.debug('exec auth due to not set refresh token')
+            self.re_auth()
+            return
 
         headers = {
             'Host': 'auth.login.yahoo.co.jp',
@@ -368,18 +373,24 @@ class YahooAuth:
         url = 'https://auth.login.yahoo.co.jp/yconnect/v2/token'
         try:
             res = self.api.request_post(url=url, headers=headers, data=data)
-            if res.status_code != 200:
-                err = ''
-                if res.status_code in [400, 401, 402]:
-                    www_auth = res.headers.get('WWW-Authenticate', {})
-                    err = www_auth.get('error', None)
-                self.log.debug('Failed to update access token message={message}'.format(message=res.text))
-                return False, res.status_code, err
-            res_json = res.json()
-            self.access_token = res_json["access_token"]
         except Exception:
             self.log.exception('Failed to request to get access token')
             raise YahooAuthError('Failed to request to get access token')
+
+        if res.status_code != 200:
+            self.log.debug('Failed to update access token message=%s', res.text)
+            if 'invalid_grant' not in res.text:
+                raise YahooAuthError('Failed to update access token not invalid grant')
+            self.log.debug('exec auth due to invalid grant')
+            self.re_auth()
+            return
+
+        try:
+            res_json = res.json()
+            self.access_token = res_json["access_token"]
+        except Exception:
+            self.log.exception('Failed to get access token')
+            raise YahooAuthError('Failed to get access token')
 
         try:
             self._output_auth_file()
@@ -387,54 +398,45 @@ class YahooAuth:
             self.log.exception('Failed to output auth file')
             raise YahooAuthError('Failed to output auth file')
 
-        return True, None, None
-
-    def update_token(self):
-        result, status, err = self._refresh()
-        if not result:
-            self._re_auth()
-
 
 class OrderListAPI:
     def __init__(self,
                  api: APIRequests,
                  auth: YahooAuth,
-                 log: logger.Logger):
+                 log: Logger):
         self.api = api
         self.auth = auth
         self.log = log
 
-        self.url = "https://circus.shopping.yahooapis.jp/ShoppingWebService/V1/orderList" \
-            if const.IS_PRODUCTION else 'https://test.circus.shopping.yahooapis.jp/ShoppingWebService/V1/orderList'
-
-        self.headers = {
-            'HTTP-Version': 'http_version',
-            'Authorization': 'Bearer {access_token}'.format(access_token=self.auth.access_token),
-            'Host': 'circus.shopping.yahooapis.jp' if const.IS_PRODUCTION else 'test.circus.shopping.yahooapis.jp',
-        }
-
+    @retry(tries=3, delay=2, backoff=2, jitter=1)
     def get(self,
             order_time_from: datetime,
             order_time_to: datetime,
             result_count: Optional[int] = 2000) -> List[OrderListData]:
-        data = """
+
+        url = "https://circus.shopping.yahooapis.jp/ShoppingWebService/V1/orderList" \
+            if const.IS_PRODUCTION else 'https://test.circus.shopping.yahooapis.jp/ShoppingWebService/V1/orderList'
+
+        headers = {
+            'HTTP-Version': 'http_version',
+            'Authorization': f'Bearer {self.auth.access_token}',
+            'Host': 'circus.shopping.yahooapis.jp' if const.IS_PRODUCTION else 'test.circus.shopping.yahooapis.jp',
+        }
+        data = f"""
            <Req>
                <Search>
-                   <Result>{result}</Result>
+                   <Result>{result_count}</Result>
                    <Start></Start>
                    <Sort>+order_time</Sort>
                    <Condition>
-                       <OrderTimeFrom>{order_time_from}</OrderTimeFrom>
-                       <OrderTimeTo>{order_time_to}</OrderTimeTo>
+                       <OrderTimeFrom>{order_time_from.strftime('%Y%m%d%H%M%S')}</OrderTimeFrom>
+                       <OrderTimeTo>{order_time_to.strftime('%Y%m%d%H%M%S')}</OrderTimeTo>
                    </Condition>
                    <Field>OrderId,OrderTime,IsYahooAuctionOrder</Field>
                </Search>
-               <SellerId>{seller_id}</SellerId>
+               <SellerId>{YahooAPI.seller_id}</SellerId>
            </Req>
-           """.format(seller_id=YahooAPI.seller_id,
-                      order_time_from=order_time_from.strftime('%Y%m%d%H%M%S'),
-                      order_time_to=order_time_to.strftime('%Y%m%d%H%M%S'),
-                      result=result_count)
+           """
         root_post = ET.fromstring(data)
         root_post.set('version', '1.0')
         root_post.set('encoding', 'UTF-8')
@@ -446,9 +448,26 @@ class OrderListAPI:
             # リクエスト
             post_data = ET.tostring(element=root_post, encoding="utf-8", method='xml')
             try:
-                res = self.api.request_post(url=self.url, headers=self.headers, data=post_data)
+                res = self.api.request_post(url=url, headers=headers, data=post_data)
                 if res.status_code != 200:
-                    return []
+                    if res.status_code == 401:
+                        www_auth = res.headers.get('WWW-Authenticate', '')
+                        re_ = re.search(r'error="(?P<error_msg>[a-zA-Z_]+)"', www_auth)
+                        if re_:
+                            error_msg = re_.group('error_msg')
+                            if error_msg in ['invalid_token']:
+                                self.log.debug('Token refresh in OrderListAPI.get')
+                                self.auth.update_token()
+                                raise YahooShoppingApiError('Failed to post request due to invalid token')
+
+                    root_res = ET.fromstring(res.text)
+                    error_code = root_res.find('.//Code').text if root_res.findall('.//Code') else ''
+                    error_msg = root_res.find('.//Message').text if root_res.findall('.//Message') else ''
+                    if error_code == 'px-04102':
+                        self.log.debug('Re auth in OrderListAPI.get')
+                        self.auth.re_auth()
+                    raise YahooShoppingApiError(
+                        f'Failed to post request due to AccessToken has been expired code={error_code}, message={error_msg}')
             except Exception:
                 self.log.exception('Failed to post request get order list')
                 raise YahooShoppingApiError('Failed to post request to get order list')
@@ -477,25 +496,25 @@ class OrderInfoAPI:
     def __init__(self,
                  api: APIRequests,
                  auth: YahooAuth,
-                 log: logger.Logger):
+                 log: Logger):
         self.api = api
         self.auth = auth
         self.log = log
 
+    @retry(tries=3, delay=2, backoff=2, jitter=1)
     def get(self, order_id: str) -> List[OrderInfoData]:
         if not order_id:
             return []
 
-        data = """
+        data = f"""
             <Req>
                 <Target>
                     <OrderId>{order_id}</OrderId>
                     <Field>OrderId,OrderStatus,ItemId,Title</Field>
                 </Target>
-                <SellerId>{seller_id}</SellerId>
+                <SellerId>{YahooAPI.seller_id}</SellerId>
             </Req>
-            """.format(seller_id=YahooAPI.seller_id,
-                       order_id=order_id)
+            """
         root_post = ET.fromstring(data)
         root_post.set('version', '1.0')
         root_post.set('encoding', 'UTF-8')
@@ -504,18 +523,34 @@ class OrderInfoAPI:
             if const.IS_PRODUCTION else 'https://test.circus.shopping.yahooapis.jp/ShoppingWebService/V1/orderInfo'
         headers = {
             'HTTP-Version': 'http_version',
-            'Authorization': 'Bearer {access_token}'.format(access_token=self.auth.access_token),
+            'Authorization': f'Bearer {self.auth.access_token}',
             'Host': 'circus.shopping.yahooapis.jp' if const.IS_PRODUCTION else 'test.circus.shopping.yahooapis.jp'
         }
         post_data = ET.tostring(element=root_post, encoding="utf-8", method='xml')
         try:
             res = self.api.request_post(url=url, headers=headers, data=post_data)
+            if res.status_code != 200:
+                if res.status_code == 401:
+                    www_auth = res.headers.get('WWW-Authenticate', '')
+                    re_ = re.search(r'error="(?P<error_msg>[a-zA-Z_]+)"', www_auth)
+                    if re_:
+                        error_msg = re_.group('error_msg')
+                        if error_msg in ['invalid_token']:
+                            self.log.debug('Token refresh in OrderInfoAPI.get')
+                            self.auth.update_token()
+                            raise YahooShoppingApiError('Failed to post request due to invalid token')
+
+                root_res = ET.fromstring(res.text)
+                error_code = root_res.find('.//Code').text if root_res.findall('.//Code') else ''
+                error_msg = root_res.find('.//Message').text if root_res.findall('.//Message') else ''
+                if error_code == 'px-04102':
+                    self.log.debug('Re auth in OrderInfoAPI.get')
+                    self.auth.re_auth()
+                raise YahooShoppingApiError(
+                    f'Failed to post request due to AccessToken has been expired code={error_code}, message={error_msg}')
         except Exception:
             self.log.exception('Failed to post request get order info list')
             raise YahooShoppingApiError('Failed to post request to get order info list')
-
-        if res.status_code != 200:
-            return []
 
         root_response = ET.fromstring(res.text)
         order_info_list = []
@@ -542,7 +577,7 @@ class OrderAPI:
     def __init__(self,
                  api: APIRequests,
                  auth: YahooAuth,
-                 log: logger.Logger):
+                 log: Logger):
         self.api = api
         self.auth = auth
         self.log = log
@@ -557,11 +592,12 @@ class StockAPI:
     def __init__(self,
                  api: APIRequests,
                  auth: YahooAuth,
-                 log: logger.Logger):
+                 log: Logger):
         self.api = api
         self.auth = auth
         self.log = log
 
+    @retry(tries=3, delay=2, backoff=2, jitter=1)
     def get(self, item_codes: List[str], chunk_size: int = 1000) -> List[GetStockData]:
         if not item_codes:
             return []
@@ -571,7 +607,7 @@ class StockAPI:
 
         headers = {
             'HTTP-Version': 'http_version',
-            'Authorization': 'Bearer {access_token}'.format(access_token=self.auth.access_token),
+            'Authorization': f'Bearer {self.auth.access_token}',
             'Host': 'circus.shopping.yahooapis.jp' if const.IS_PRODUCTION else 'test.circus.shopping.yahooapis.jp'
         }
 
@@ -589,7 +625,21 @@ class StockAPI:
             try:
                 res = self.api.request_post(url=url, headers=headers, data=post_data)
                 if res.status_code != 200:
-                    return []
+                    if res.status_code == 401:
+                        www_auth = res.headers.get('WWW-Authenticate', '')
+                        re_ = re.search(r'error="(?P<error_msg>[a-zA-Z_]+)"', www_auth)
+                        if re_:
+                            error_msg = re_.group('error_msg')
+                            if error_msg in ['invalid_token']:
+                                self.log.debug('Token refresh in StockAPI.get')
+                                self.auth.update_token()
+                                raise YahooShoppingApiError('Failed to post request due to invalid token')
+
+                    root_res = ET.fromstring(res.text)
+                    error_code = root_res.find('.//Code').text if root_res.findall('.//Code') else ''
+                    error_msg = root_res.find('.//Message').text if root_res.findall('.//Message') else ''
+                    raise YahooShoppingApiError(
+                        f'Failed to post request code={error_code}, message={error_msg}')
             except Exception:
                 self.log.exception('Failed to post request to get stock')
                 raise YahooAuthError('Failed to post request to get stock')
@@ -614,6 +664,7 @@ class StockAPI:
 
         return stock_list
 
+    @retry(tries=3, delay=2, backoff=2, jitter=1)
     def set(self, set_stock_list: List[SetStockData]) -> List[SetStockResponseData]:
         if not set_stock_list:
             return []
@@ -634,14 +685,28 @@ class StockAPI:
 
         headers = {
             'HTTP-Version': 'http_version',
-            'Authorization': 'Bearer {access_token}'.format(access_token=self.auth.access_token),
+            'Authorization': f'Bearer {self.auth.access_token}',
             'Host': 'circus.shopping.yahooapis.jp' if const.IS_PRODUCTION else 'test.circus.shopping.yahooapis.jp'
         }
 
         try:
             res = self.api.request_post(url=url, headers=headers, data=post_data)
             if res.status_code != 200:
-                return []
+                if res.status_code == 401:
+                    www_auth = res.headers.get('WWW-Authenticate', '')
+                    re_ = re.search(r'error="(?P<error_msg>[a-zA-Z_]+)"', www_auth)
+                    if re_:
+                        error_msg = re_.group('error_msg')
+                        if error_msg in ['invalid_token']:
+                            self.log.debug('Token update in StockAPI.set')
+                            self.auth.update_token()
+                            raise YahooShoppingApiError('Failed to post request due to invalid token')
+
+                root_res = ET.fromstring(res.text)
+                error_code = root_res.find('.//Code').text if root_res.findall('.//Code') else ''
+                error_msg = root_res.find('.//Message').text if root_res.findall('.//Message') else ''
+                raise YahooShoppingApiError(
+                    f'Failed to post request code={error_code}, message={error_msg}')
         except Exception:
             self.log.exception('Failed to post request to set stock')
             raise YahooAuthError('Failed to post request to set stock')
@@ -669,7 +734,7 @@ class ShoppingAPI:
     def __init__(self,
                  api: APIRequests,
                  auth: YahooAuth,
-                 log: logger.Logger):
+                 log: Logger):
         self.order = OrderAPI(api=api, auth=auth, log=log)
         self.stock = StockAPI(api=api, auth=auth, log=log)
 
@@ -686,17 +751,20 @@ class YahooAPI:
                  business_password: str,
                  yahoo_id: str,
                  yahoo_password: str,
-                 log: logger.Logger,
+                 log: Logger,
                  retry_total: int = 5,
                  backoff_factor: int = 2,
                  connect_timeout: float = 30.0,
-                 read_timeout: float = 60.0):
+                 read_timeout: float = 60.0,
+                 cert: Optional[Tuple[str, str]] = None,
+                 ):
         self.profile_dir = profile_dir
         self.log = log
         self.api = APIRequests(retry_total=retry_total,
                                backoff_factor=backoff_factor,
                                connect_timeout=connect_timeout,
-                               read_timeout=read_timeout)
+                               read_timeout=read_timeout,
+                               cert=cert)
         # yahooID連携
         self.auth = YahooAuth(api=self.api,
                               profile_dir=self.profile_dir,
@@ -708,7 +776,6 @@ class YahooAPI:
                               business_password=business_password,
                               yahoo_id=yahoo_id,
                               yahoo_password=yahoo_password)
-
         # ショッピングAPI
         self.shopping = ShoppingAPI(api=self.api, auth=self.auth, log=self.log)
 

@@ -39,7 +39,9 @@ CHROME_PROFILE_DIR = os.path.join(BASE_DIR, CHROME_PROFILE_DIRNAME)
 # wsdl
 WSDL_DIRNAME = CFG.get('dir.common', 'wsdl_dirname')
 WSDL_DIR = os.path.join(BASE_DIR, WSDL_DIRNAME)
-
+# 証明書
+CERT_DIRNAME = CFG.get('dir.common', 'cert_dirname')
+CERT_DIR = os.path.join(BASE_DIR, CERT_DIRNAME)
 
 # ------- 本番環境/ローカル開発環境切り替え ----------
 IS_PRODUCTION = CFG.getboolean('env.common', 'is_production')
@@ -51,7 +53,7 @@ LOG_SETTING_MAX_FILE_SIZE = CFG.getint('logger_setting.common', 'log_max_file_si
 LOG_SETTING_BACKUP_FILE_COUNT = CFG.getint('logger_setting.common', 'log_backup_file_count')
 LOG_SETTING_STDOUT = CFG.getboolean('logger_setting.common', 'log_stdout')
 LOG_SETTING_RAISE_EXCEPTION = CFG.getboolean('logger_setting.common', 'log_raise_exception')
-LOG_SETTING_FORMAT = "%(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(funcName)s | %(message)s"
+LOG_SETTING_FORMAT = "%(name)s | %(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(module)s | %(funcName)s | %(lineno)d | %(message)s"
 LOG_SETTING = {
     'log_dir': LOG_DIR,
     'raise_exceptions': LOG_SETTING_RAISE_EXCEPTION,
@@ -81,18 +83,35 @@ YJDN_CALLBACK_URL = CFG.get('yjdn.common', 'callback_url')  # コールバック
 
 # ------- Yahoo!ショッピング関連 ----------
 # 認証情報
-YSHOP_BUSINESS_ID = CREDENTIALS['yahoo_shopping']['production']['business_id']
-YSHOP_BUSINESS_PASSWORD = CREDENTIALS['yahoo_shopping']['production']['business_password']
-YSHOP_YAHOO_ID = CREDENTIALS['yahoo_shopping']['production']['yahoo_id']
-YSHOP_YAHOO_PASSWORD = CREDENTIALS['yahoo_shopping']['production']['yahoo_password']
+if IS_PRODUCTION:
+    YSHOP_BUSINESS_ID = CREDENTIALS['yahoo_shopping']['production']['business_id']
+    YSHOP_BUSINESS_PASSWORD = CREDENTIALS['yahoo_shopping']['production']['business_password']
+    YSHOP_YAHOO_ID = CREDENTIALS['yahoo_shopping']['production']['yahoo_id']
+    YSHOP_YAHOO_PASSWORD = CREDENTIALS['yahoo_shopping']['production']['yahoo_password']
+else:
+    YSHOP_BUSINESS_ID = CREDENTIALS['yahoo_shopping']['test']['business_id']
+    YSHOP_BUSINESS_PASSWORD = CREDENTIALS['yahoo_shopping']['test']['business_password']
+    YSHOP_YAHOO_ID = CREDENTIALS['yahoo_shopping']['test']['yahoo_id']
+    YSHOP_YAHOO_PASSWORD = CREDENTIALS['yahoo_shopping']['test']['yahoo_password']
 
-YSHOP_SELLER_ID = CFG.get('yshop.common', 'seller_id')  # セラーID
+YSHOP_SELLER_ID = CFG.get('yshop.production', 'seller_id') if IS_PRODUCTION else CFG.get('yshop.test', 'seller_id')
 
+# 証明書
+# 秘密鍵(.key)
+YSHOP_CERT_PKEY_FILENAME = CFG.get('yshop.production' if IS_PRODUCTION else 'yshop.test', 'api_cert_pkey_filename')
+YSHOP_CERT_PKEY_FILE = os.path.join(CERT_DIR, YSHOP_CERT_PKEY_FILENAME) if YSHOP_CERT_PKEY_FILENAME else None
+# サーバ証明書(.crt)
+YSHOP_CERT_CRT_FILENAME = CFG.get('yshop.production' if IS_PRODUCTION else 'yshop.test', 'api_cert_crt_filename')
+YSHOP_CERT_CRT_FILE = os.path.join(CERT_DIR, YSHOP_CERT_CRT_FILENAME) if YSHOP_CERT_CRT_FILENAME else None
 
 # ------- 楽天関連 ----------
 # 認証情報
-RMS_API_SERVICE_SECRET = CREDENTIALS['rms']['production']['api']['service_secret']
-RMS_API_LICENSE_KEY = CREDENTIALS['rms']['production']['api']['license_key']
+if IS_PRODUCTION:
+    RMS_API_SERVICE_SECRET = CREDENTIALS['rms']['production']['api']['service_secret']
+    RMS_API_LICENSE_KEY = CREDENTIALS['rms']['production']['api']['license_key']
+else:
+    RMS_API_SERVICE_SECRET = CREDENTIALS['rms']['test']['api']['service_secret']
+    RMS_API_LICENSE_KEY = CREDENTIALS['rms']['test']['api']['license_key']
 
 # WSDLファイル
 RMS_WSDL_FILENAME = CFG.get('rakuten.common', 'wsdl_filename')
@@ -100,7 +119,11 @@ RMS_WSDL_FILE = os.path.join(WSDL_DIR, RMS_WSDL_FILENAME)
 
 # ------- AuPayマーケット関連 ----------
 # 認証情報
-AUPAYM_API_KEY = CREDENTIALS['au_pay_market']['production']['api']['api_key']
+if IS_PRODUCTION:
+    AUPAYM_API_KEY = CREDENTIALS['au_pay_market']['production']['api']['api_key']
+else:
+    AUPAYM_API_KEY = CREDENTIALS['au_pay_market']['test']['api']['api_key']
+
 
 AU_SHOP_ID = CFG.getint('au.common', 'shop_id')  # ショップID
 
@@ -111,8 +134,8 @@ DRIVER_HEADLESS = CFG.getboolean('browser.common', 'headless')
 
 # ------- メッセージキュー(MQ)関連 ----------
 # 認証情報
-MQ_USER_ID = CREDENTIALS['mq']['production']['user'] if IS_PRODUCTION else CREDENTIALS['mq']['local']['user']
-MQ_PASSWORD = CREDENTIALS['mq']['production']['password'] if IS_PRODUCTION else CREDENTIALS['mq']['local']['password']
+MQ_USER_ID = CREDENTIALS['mq']['production']['user'] if IS_PRODUCTION else CREDENTIALS['mq']['test']['user']
+MQ_PASSWORD = CREDENTIALS['mq']['production']['password'] if IS_PRODUCTION else CREDENTIALS['mq']['test']['password']
 
 # 接続情報
 MQ_HOST = CFG.get('mq.common', 'host')

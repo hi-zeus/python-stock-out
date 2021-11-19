@@ -6,12 +6,13 @@ from typing import Dict
 import functools
 
 import const
+from logging import Logger
 import logger
 from mq import MQ, MQMsgData
 import auapi
 
 
-def _stockout(msg_data: MQMsgData, log: logger.Logger):
+def _stockout(msg_data: MQMsgData, log: Logger):
     set_list = []
     item_ids = msg_data.item_ids
     for item_id in item_ids:
@@ -24,23 +25,23 @@ def _stockout(msg_data: MQMsgData, log: logger.Logger):
         except Exception:
             log.exception('Failed to update stock')
             raise
-    log.info('Update stock data={data}'.format(data=set_list))
-    log.info('No update stock data={data}'.format(data=result))
+    log.info('Update stock data=%s', set_list)
+    log.info('No update stock data=%s', result)
 
 
-def _relist_on_message(msg: Dict, log: logger.Logger) -> bool:
-    log.info('Message data={data}'.format(data=logger.var_dump(msg)))
+def _relist_on_message(msg: Dict, log: Logger) -> bool:
+    log.info('Message data=%s', logger.var_dump(msg))
     try:
         msg_data = MQMsgData(**msg)
     except Exception:
         raise Exception('Receive message parse error')
-    log.info('Get queue message data={data}'.format(data=msg_data))
+    log.info('Get queue message data=%s', msg_data)
 
     _stockout(msg_data=msg_data, log=log)
     return True
 
 
-def _consumer(log: logger.Logger):
+def _consumer(log: Logger):
     try:
         with MQ(**const.MQ_CONNECT,
                 queue=const.MQ_AU_QUEUE,
@@ -64,13 +65,13 @@ def main():
     arg_parser = parser.parse_args()
 
     # ログ
-    log = logger.Logger(task_name='stockout-au-consumer',
-                        sub_name='main',
-                        name_datetime=datetime.now(),
-                        task_no=arg_parser.task_no,
-                        **const.LOG_SETTING)
+    log = logger.get_logger(task_name='stockout-au-consumer',
+                            sub_name='main',
+                            name_datetime=datetime.now(),
+                            task_no=arg_parser.task_no,
+                            **const.LOG_SETTING)
     log.info('Start task')
-    log.info('Input args task_no={task_no}'.format(task_no=arg_parser.task_no))
+    log.info('Input args task_no=%s', arg_parser.task_no)
 
     _consumer(log=log)
     log.info('End task')

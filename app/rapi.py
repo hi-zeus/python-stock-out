@@ -8,7 +8,7 @@ from datetime import datetime
 import json
 import zeep
 
-import logger
+from logging import Logger
 import const
 from apireq import APIRequests
 
@@ -64,7 +64,7 @@ class RakutenAPIError(Exception):
 
 class RakutenAPI:
     def __init__(self,
-                 log: logger.Logger,
+                 log: Logger,
                  retry_total: int = 5,
                  backoff_factor: int = 2,
                  connect_timeout: float = 30.0,
@@ -98,7 +98,7 @@ class RakutenAPI:
 
 
 class RakutenItemAPI:
-    def __init__(self, api: APIRequests, log: logger.Logger):
+    def __init__(self, api: APIRequests, log: Logger):
         self._api = api
         self.log = log
 
@@ -145,7 +145,7 @@ class RakutenItemAPI:
         return item_data
 
     def update(self, item_url: str, inventory_count: int) -> bool:
-        data = """<?xml version="1.0" encoding="UTF-8"?>
+        data = f"""<?xml version="1.0" encoding="UTF-8"?>
             <request>
                 <itemUpdateRequest>
                     <item>
@@ -161,8 +161,7 @@ class RakutenItemAPI:
                     </item>
                 </itemUpdateRequest>
             </request>
-            """.format(item_url=item_url,
-                       inventory_count=inventory_count)
+            """
 
         # ET.dump(root)
         headers = {
@@ -188,7 +187,7 @@ class RakutenItemAPI:
 
 
 class RakutenOrderAPI:
-    def __init__(self, api: APIRequests, log: logger.Logger):
+    def __init__(self, api: APIRequests, log: Logger):
         self._api = api
         self.log = log
 
@@ -289,7 +288,7 @@ class RakutenOrderAPI:
 
 
 class RakutenInventoryAPI:
-    def __init__(self, log: logger.Logger):
+    def __init__(self, log: Logger):
         self.log = log
         self._client = zeep.Client(wsdl=const.RMS_WSDL_FILE)
 

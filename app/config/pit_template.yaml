@@ -1,6 +1,6 @@
 {
   "RMS": {
-    "local": {
+    "test": {
       "api": {
         "service_secret": ,
         "license_key":
@@ -14,7 +14,7 @@
     }
   },
   "AuPayMarket": {
-    "local": {
+    "test": {
       "api": {
         "api_key":
       }
@@ -26,7 +26,7 @@
     }
   },
   "YahooShopping": {
-    "local": {
+    "test": {
       "business_id": ,
       "business_password": ,
       "yahoo_id": ,
@@ -66,7 +66,7 @@
     }
   },
   "MQ": {
-    "local": {
+    "test": {
       "user": ,
       "password":
     },

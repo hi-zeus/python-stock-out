@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-
+import time
 from requests import Session, Response
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, Tuple
 
 
 class APIError(Exception):
@@ -20,7 +20,9 @@ class APIRequests:
                  retry_total: int = 5,
                  backoff_factor: int = 2,
                  connect_timeout: float = 30.0,
-                 read_timeout: float = 60.0):
+                 read_timeout: float = 60.0,
+                 cert: Optional[Tuple[str, str]] = None,
+                 ):
         self.retry_total = retry_total
         self.backoff_factor = backoff_factor
         self.connect_timeout = connect_timeout
@@ -32,6 +34,7 @@ class APIRequests:
                         status_forcelist=[500, 502, 503, 504])
         session.mount('http://', HTTPAdapter(max_retries=retries))
         session.mount('https://', HTTPAdapter(max_retries=retries))
+        session.cert = cert
         self.session: Optional[Session] = session
 
     def close(self):
@@ -45,8 +48,9 @@ class APIRequests:
                                         params=payload,
                                         headers=headers,
                                         timeout=(self.connect_timeout, self.read_timeout))
+            time.sleep(1)
         except Exception:
-            raise APIError('API exception error during requests.post()')
+            raise APIError('API exception error during requests.get')
 
         return response
 
@@ -56,7 +60,8 @@ class APIRequests:
                                          headers=headers,
                                          data=data,
                                          timeout=(self.connect_timeout, self.read_timeout))
+            time.sleep(1)
         except Exception:
-            raise APIError('API post error during requests.post()')
+            raise APIError('API post error during requests.post')
 
         return response
