@@ -45,23 +45,24 @@ def _stockout(msg_data: MQMsgData,
 
         set_list = []
         for stock_data in stock_list:
-            log.info('stock item=%s', stock_data)
+            log.info('Stock item data=%s', stock_data)
             item_id = stock_data.item_code
             quantity = stock_data.quantity
             if quantity > 0:
+                log.info('Out of stock item id=%s', item_id)
                 stock_data = ysapi.SetStockData(item_code=item_id, quantity=0)
                 set_list.append(stock_data)
 
         if set_list:
             try:
                 result = api.shopping.stock.set(set_stock_list=set_list)
-                log.info('Update stock data=%s', set_list)
-                log.info('update stock error data=%s', result)
+                log.info('Updated stock items=%s', set_list)
+                log.info('Not Updated stock items=%s', result)
                 return
             except Exception:
                 log.exception('Failed to update stock')
                 raise Exception('stockout error')
-        log.info('NA update stock data')
+        log.info('N/A update stock data')
 
 
 def _relist_on_message(msg: Dict,
