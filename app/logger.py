@@ -15,13 +15,13 @@ def get_logger(log_dir,
                raise_exceptions=True,
                log_level='DEBUG',
                stdout=False,
-               log_format="%(name)s | %(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(module)s | %(funcName)s | %(lineno)d | %(message)s",
+               log_format="%(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(module)s | %(funcName)s | %(lineno)d | %(message)s",
                max_file_size=1024,
                backup_file_count=10):
     names = ['log']
     if task_name:
         names.append(task_name)
-    names.append(name_datetime.strftime('%Y-%m-%d_%Hh%Mm%Ss'))
+    names.append(name_datetime.strftime('%Y-%m-%d'))
     if sub_name:
         names.append(sub_name)
     if task_no:

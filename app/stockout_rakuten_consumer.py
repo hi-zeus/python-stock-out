@@ -23,7 +23,9 @@ def _stockout(msg_data: MQMsgData, log: Logger):
 
         set_list = []
         for inventory_data in inventories:
+            log.info('Inventory item data=%s', inventory_data)
             if inventory_data.inventory_count > 0:
+                log.info('Out of stock item id=%s', inventory_data.item_url)
                 set_data = rapi.InventoryUpdateData(item_url=inventory_data.item_url,
                                                     inventory_count=0)
                 set_list.append(set_data)
@@ -35,11 +37,11 @@ def _stockout(msg_data: MQMsgData, log: Logger):
             except Exception:
                 log.exception('Failed to update stock')
                 raise Exception('stockout error')
-            log.info('Update stock data=%s', set_list)
-            log.info('update stock error data=%s', result)
+            log.info('Updated stock items=%s', set_list)
+            log.info('Not updated stock items=%s', result)
             return
 
-        log.info('NA update stock data')
+        log.info('N/A update stock data')
 
 
 def _relist_on_message(msg: Dict, log: Logger) -> bool:

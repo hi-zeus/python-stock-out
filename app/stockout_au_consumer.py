@@ -21,12 +21,13 @@ def _stockout(msg_data: MQMsgData, log: Logger):
 
     with auapi.AuAPI(log=log) as api:
         try:
+            log.info('Request to stock out list=%s', set_list)
             result = api.stock.update(update_items=set_list)
         except Exception:
             log.exception('Failed to update stock')
             raise
-    log.info('Update stock data=%s', set_list)
-    log.info('No update stock data=%s', result)
+    log.info('Updated stock items=%s', set_list)
+    log.info('Not updated stock items=%s', result)
 
 
 def _relist_on_message(msg: Dict, log: Logger) -> bool:

@@ -7,3 +7,6 @@
 秘密鍵: key/fukuwauchi-player.key
 
 公開鍵: key/SHP-fukuwauchi-player.crt
+
+## 注意
+・Windowsタスクスケジューラは、1つずつ終了してください。正常に終了できずにゾンビプロセスが発生する場合があります。

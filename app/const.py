@@ -53,7 +53,7 @@ LOG_SETTING_MAX_FILE_SIZE = CFG.getint('logger_setting.common', 'log_max_file_si
 LOG_SETTING_BACKUP_FILE_COUNT = CFG.getint('logger_setting.common', 'log_backup_file_count')
 LOG_SETTING_STDOUT = CFG.getboolean('logger_setting.common', 'log_stdout')
 LOG_SETTING_RAISE_EXCEPTION = CFG.getboolean('logger_setting.common', 'log_raise_exception')
-LOG_SETTING_FORMAT = "%(name)s | %(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(module)s | %(funcName)s | %(lineno)d | %(message)s"
+LOG_SETTING_FORMAT = "%(asctime)s | %(levelname)s | %(process)d | %(thread)d | %(module)s | %(funcName)s | %(lineno)d | %(message)s"
 LOG_SETTING = {
     'log_dir': LOG_DIR,
     'raise_exceptions': LOG_SETTING_RAISE_EXCEPTION,
